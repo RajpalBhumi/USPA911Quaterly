@@ -94,9 +94,9 @@ def fill_excel_template(template_bytes, data_dict, section_v_data):
     # Re-insert logo at top-left (always visible)
     try:
         logo = ExcelImage("logo.png")
-        logo.width = 150
-        logo.height = 50
-        ws.add_image(logo, "B1")
+        logo.width = 200
+        logo.height = 100
+        ws.add_image(logo, "D1")
     except FileNotFoundError:
         print("⚠️ logo.png not found — skipping image.")
 
@@ -109,9 +109,9 @@ st.caption("Upload Avalara confirmations and get remittance Excel reports auto-f
 
 # Section V form
 st.sidebar.header("✍️ Section V – Certification Info")
-initials = st.sidebar.text_input("Initials", "Rhenry")
+initials = st.sidebar.text_input("Initials", "BHUMI R")
 title = st.sidebar.text_input("Title", "Sr Tax Analyst")
-full_name = st.sidebar.text_input("Full Name", "Rachel Henry")
+full_name = st.sidebar.text_input("Full Name", "BHUMI R")
 cert_date = st.sidebar.date_input("Date", value=date.today())
 
 section_v_data = {
