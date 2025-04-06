@@ -96,7 +96,7 @@ def fill_excel_template(template_bytes, data_dict, section_v_data):
         logo = ExcelImage("logo.png")
         logo.width = 250
         logo.height = 100
-        ws.add_image(logo, "D1")
+        ws.add_image(logo, "E1")
     except FileNotFoundError:
         print("⚠️ logo.png not found — skipping image.")
 
