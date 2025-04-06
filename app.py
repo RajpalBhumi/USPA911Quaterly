@@ -84,17 +84,17 @@ def fill_excel_template(template_bytes, data_dict, section_v_data):
             if cell_range in [str(rng) for rng in ws.merged_cells.ranges]:
                 ws.unmerge_cells(cell_range)
 
-        ws.cell(row=41, column=2).value = section_v_data["initials"]     # B41
-        ws.cell(row=41, column=5).value = section_v_data["title"]        # E41
-        ws.cell(row=41, column=6).value = section_v_data["date"]         # F41
-        ws.cell(row=43, column=2).value = section_v_data["full_name"]    # B43
+        ws.cell(row=45, column=1).value = section_v_data["initials"]     # A45
+        ws.cell(row=45, column=4).value = section_v_data["title"]        # D45
+        ws.cell(row=45, column=6).value = section_v_data["date"]         # F45
+        ws.cell(row=47, column=1).value = section_v_data["full_name"]    # A47
     except Exception as e:
         print("❌ Error writing Section V:", e)
 
     # Re-insert logo at top-left (always visible)
     try:
         logo = ExcelImage("logo.png")
-        logo.width = 200
+        logo.width = 250
         logo.height = 100
         ws.add_image(logo, "D1")
     except FileNotFoundError:
