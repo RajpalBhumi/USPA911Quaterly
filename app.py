@@ -6,6 +6,7 @@ import zipfile
 import os
 import re
 from openpyxl import load_workbook
+from datetime import date
 
 # SECTION I Contact Info (Always Static)
 contact_info = {
@@ -56,8 +57,8 @@ def parse_pdf_data(text):
 
     return data
 
-# Fill Excel template with extracted data
-def fill_excel_template(template_bytes, data_dict):
+# Fill Excel template
+def fill_excel_template(template_bytes, data_dict, section_v_data):
     wb = load_workbook(filename=template_bytes)
     ws = wb["Remittance Report"]
 
@@ -76,13 +77,19 @@ def fill_excel_template(template_bytes, data_dict):
 
     ws["E12"] = data_dict.get("Period Ending", "")
 
-    # Safely extract payment amount with regex
+    # Payment amount parsing
     payment_raw = data_dict.get("Payment Amount", "")
     payment_match = re.search(r"[\d,]+\.\d{2}", payment_raw)
     if payment_match:
         ws["F13"] = float(payment_match.group(0).replace(",", ""))
     else:
         ws["F13"] = 0.0
+
+    # SECTION V - Certification
+    ws["B41"] = section_v_data["initials"]
+    ws["E41"] = section_v_data["title"]
+    ws["F41"] = section_v_data["date"]
+    ws["B43"] = section_v_data["full_name"]
 
     return wb
 
@@ -91,8 +98,22 @@ st.set_page_config(page_title="911 Remittance Excel Generator", layout="centered
 st.title("📄 Avalara PDF ➝ Excel Remittance Report")
 st.caption("Upload Avalara PDFs to generate branded, pre-filled Excel reports.")
 
-# Template file — must exist in same directory as this script
-template_file = "Template Report.xlsx"
+# SECTION V Inputs in sidebar
+st.sidebar.title("✍️ Section V - Certification")
+initials = st.sidebar.text_input("Initials", value="Rhenry")
+title = st.sidebar.text_input("Title", value="Sr Tax Analyst")
+full_name = st.sidebar.text_input("Full Name", value="Rachel Henry")
+cert_date = st.sidebar.date_input("Date", value=date.today())
+
+section_v_data = {
+    "initials": initials,
+    "title": title,
+    "full_name": full_name,
+    "date": cert_date.strftime("%-m/%-d/%Y")  # Format: 4/15/2024
+}
+
+# Template file
+template_file = "Affiliated Unified 2403 Uniform-911-Surcharge-Remittance- Report.xlsx"
 
 uploaded_files = st.file_uploader("Upload Avalara confirmation PDF(s)", type="pdf", accept_multiple_files=True)
 
@@ -111,9 +132,9 @@ if uploaded_files:
             with st.spinner(f"Processing {pdf.name}..."):
                 text = extract_pdf_text(pdf.read())
                 data = parse_pdf_data(text)
-                wb = fill_excel_template(template_bytes, data)
+                wb = fill_excel_template(template_bytes, data, section_v_data)
 
-                # Save workbook in memory (no deprecated functions used)
+                # Save to memory
                 excel_buffer = io.BytesIO()
                 wb.save(excel_buffer)
                 excel_buffer.seek(0)
