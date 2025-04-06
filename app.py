@@ -62,7 +62,7 @@ def fill_excel_template(template_bytes, data_dict, section_v_data):
     wb = load_workbook(filename=template_bytes)
     ws = wb["Remittance Report"]
 
-    # SECTION I
+    # SECTION I - Static
     ws["B7"] = data_dict.get("Provider Name", "")
     ws["B8"] = data_dict.get("Federal Tax ID", "")
     ws["B9"] = data_dict.get("Customer ID", "")
@@ -74,20 +74,21 @@ def fill_excel_template(template_bytes, data_dict, section_v_data):
     ws["E10"] = contact_info["E-mail"]
     ws["E12"] = data_dict.get("Period Ending", "")
 
-    # SECTION I Payment
+    # Payment (clean float)
     payment_raw = data_dict.get("Payment Amount", "")
-    payment_match = re.search(r"[\d,]+\.\d{2}", payment_raw)
-    ws["F13"] = float(payment_match.group(0).replace(",", "")) if payment_match else 0.0
+    match = re.search(r"[\d,]+\.\d{2}", payment_raw)
+    ws["F13"] = float(match.group(0).replace(",", "")) if match else 0.0
 
     # SECTION V - CERTIFICATION
+    # Safely write to merged cells using top-left anchor directly
     try:
-        # These should be the top-left cells of merged ranges
-        ws["B41"].value = section_v_data["initials"]
-        ws["E41"].value = section_v_data["title"]
-        ws["F41"].value = section_v_data["date"]
-        ws["B43"].value = section_v_data["full_name"]
+        # These cells must match the anchor positions of the merged cells
+        ws["B41"] = section_v_data["initials"]
+        ws["E41"] = section_v_data["title"]
+        ws["F41"] = section_v_data["date"]
+        ws["B43"] = section_v_data["full_name"]
     except Exception as e:
-        print("❌ Error filling Section V:", e)
+        print(f"[!] Section V fill failed: {e}")
 
     return wb
 
