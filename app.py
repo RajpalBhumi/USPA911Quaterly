@@ -9,7 +9,7 @@ from datetime import date
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image as ExcelImage
 
-# SECTION I Contact Info (Static)
+# SECTION I Contact Info
 contact_info = {
     "Contact Name": "Seth Tenore",
     "Phone": "877-780-4848",
@@ -24,7 +24,7 @@ def extract_pdf_text(file_bytes):
     doc.close()
     return text
 
-# Parse required fields from text
+# Parse required fields
 def parse_pdf_data(text):
     lines = text.splitlines()
     data = {}
@@ -56,7 +56,7 @@ def parse_pdf_data(text):
                 data["Period Ending"] = "3-31-2024"
     return data
 
-# Fill Excel using correct cell anchors and optional logo
+# Fill Excel template
 def fill_excel_template(template_bytes, data_dict, section_v_data):
     wb = load_workbook(filename=template_bytes)
     ws = wb["Remittance Report"]
@@ -78,29 +78,32 @@ def fill_excel_template(template_bytes, data_dict, section_v_data):
     match = re.search(r"[\d,]+\.\d{2}", payment_raw)
     ws["F13"] = float(match.group(0).replace(",", "")) if match else 0.0
 
-    # SECTION V - Certification (correct anchor cells)
-    ws["B41"] = section_v_data["initials"]
-    ws["D41"] = section_v_data["title"]
-    ws["F41"] = section_v_data["date"]
-    ws["B43"] = section_v_data["full_name"]
-
-    # Re-insert logo if it was removed during open/save
+    # SECTION V - Certification (use .cell() to avoid merged cell errors)
     try:
-        logo = ExcelImage("logo.png")  # Make sure this file exists
+        ws.cell(row=41, column=2).value = section_v_data["initials"]     # B41
+        ws.cell(row=41, column=4).value = section_v_data["title"]        # D41
+        ws.cell(row=41, column=6).value = section_v_data["date"]         # F41
+        ws.cell(row=43, column=2).value = section_v_data["full_name"]    # B43
+    except Exception as e:
+        print("❌ Error writing Section V values:", e)
+
+    # Re-insert logo if available
+    try:
+        logo = ExcelImage("logo.png")
         logo.width = 150
         logo.height = 50
         ws.add_image(logo, "G1")
     except FileNotFoundError:
-        print("⚠️ Logo not found: logo.png — skipping image.")
+        print("⚠️ logo.png not found — skipping image.")
 
     return wb
 
 # Streamlit UI
 st.set_page_config(page_title="911 Remittance Excel Generator", layout="centered")
 st.title("📄 Avalara PDF ➝ Branded Excel Report Generator")
-st.caption("Upload Avalara confirmation PDFs to auto-fill branded Excel remittance reports.")
+st.caption("Upload Avalara PDFs to generate official remittance Excel files with your contact and certification details.")
 
-# Sidebar inputs for Section V
+# Sidebar – Section V form
 st.sidebar.header("✍️ Section V – Certification Info")
 initials = st.sidebar.text_input("Initials", "Rhenry")
 title = st.sidebar.text_input("Title", "Sr Tax Analyst")
@@ -111,12 +114,12 @@ section_v_data = {
     "initials": initials,
     "title": title,
     "full_name": full_name,
-    "date": cert_date.strftime("%-m/%-d/%Y")  # e.g., 4/15/2024
+    "date": cert_date.strftime("%-m/%-d/%Y")  # Format: 4/15/2024
 }
 
-# Template and PDF uploads
+# File handling
 template_file = "Template Report.xlsx"
-uploaded_files = st.file_uploader("Upload Avalara PDF(s)", type="pdf", accept_multiple_files=True)
+uploaded_files = st.file_uploader("Upload Avalara confirmation PDF(s)", type="pdf", accept_multiple_files=True)
 
 if uploaded_files:
     zip_buffer = io.BytesIO()
@@ -126,12 +129,12 @@ if uploaded_files:
             with st.spinner(f"Processing {pdf.name}..."):
                 try:
                     text = extract_pdf_text(pdf.read())
-                    extracted_data = parse_pdf_data(text)
+                    data = parse_pdf_data(text)
 
                     with open(template_file, "rb") as f:
-                        template_bytes = io.BytesIO(f.read())  # fresh copy each time
+                        template_bytes = io.BytesIO(f.read())
 
-                    wb = fill_excel_template(template_bytes, extracted_data, section_v_data)
+                    wb = fill_excel_template(template_bytes, data, section_v_data)
 
                     excel_buffer = io.BytesIO()
                     wb.save(excel_buffer)
@@ -143,7 +146,7 @@ if uploaded_files:
                     st.error(f"❌ Error processing {pdf.name}: {e}")
 
     zip_buffer.seek(0)
-    st.success("✅ All Excel files generated!")
+    st.success("✅ All Excel reports generated!")
 
     st.download_button(
         label="📦 Download ZIP of Reports",
