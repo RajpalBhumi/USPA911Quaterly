@@ -92,7 +92,7 @@ st.title("📄 Avalara PDF ➝ Excel Remittance Report")
 st.caption("Upload Avalara PDFs to generate branded, pre-filled Excel reports.")
 
 # Template file — must exist in same directory as this script
-template_file = "Affiliated Unified 2403 Uniform-911-Surcharge-Remittance- Report.xlsx"
+template_file = "Template Report.xlsx"
 
 uploaded_files = st.file_uploader("Upload Avalara confirmation PDF(s)", type="pdf", accept_multiple_files=True)
 
