@@ -17,14 +17,14 @@ contact_info = {
     "E-mail": "communicationonlinefiling@avalara.com"
 }
 
-# Extract all text from PDF
+# Extract full text from PDF
 def extract_pdf_text(file_bytes):
     doc = fitz.open(stream=file_bytes, filetype="pdf")
     text = "".join([page.get_text() for page in doc])
     doc.close()
     return text
 
-# Extract specific fields from PDF text
+# Parse PDF content into structured fields
 def parse_pdf_data(text):
     lines = text.splitlines()
     data = {}
@@ -56,7 +56,7 @@ def parse_pdf_data(text):
                 data["Period Ending"] = "3-31-2024"
     return data
 
-# Fill Excel based on parsed + sidebar data
+# Fill in the Excel template from PDF + sidebar inputs
 def fill_excel_template(template_bytes, data_dict, section_v_data):
     wb = load_workbook(filename=template_bytes)
     ws = wb["Remittance Report"]
@@ -73,41 +73,41 @@ def fill_excel_template(template_bytes, data_dict, section_v_data):
     ws["E10"] = contact_info["E-mail"]
     ws["E12"] = data_dict.get("Period Ending", "")
 
-    # SECTION I payment
+    # Payment amount
     payment_raw = data_dict.get("Payment Amount", "")
     match = re.search(r"[\d,]+\.\d{2}", payment_raw)
     ws["F13"] = float(match.group(0).replace(",", "")) if match else 0.0
 
-    # SECTION V – safely fill values
+    # SECTION V – unmerge and write data safely
     try:
-        for cell_range in ["B41:D41", "E41:E41", "F41:F41", "B43:D43"]:
+        for cell_range in ["B41:D41", "E41:F41", "B43:D43"]:
             if cell_range in [str(rng) for rng in ws.merged_cells.ranges]:
                 ws.unmerge_cells(cell_range)
 
-        ws["B41"] = section_v_data["initials"]
-        ws["D41"] = section_v_data["title"]
-        ws["F41"] = section_v_data["date"]
-        ws["B43"] = section_v_data["full_name"]
+        ws.cell(row=41, column=2).value = section_v_data["initials"]     # B41
+        ws.cell(row=41, column=5).value = section_v_data["title"]        # E41
+        ws.cell(row=41, column=6).value = section_v_data["date"]         # F41
+        ws.cell(row=43, column=2).value = section_v_data["full_name"]    # B43
     except Exception as e:
-        print("❌ Section V error:", e)
+        print("❌ Error writing Section V:", e)
 
-    # Reinsert logo at correct position
+    # Re-insert logo at top-left (always visible)
     try:
         logo = ExcelImage("logo.png")
         logo.width = 150
         logo.height = 50
-        ws.add_image(logo, "H1")  # Adjust as needed
+        ws.add_image(logo, "B1")
     except FileNotFoundError:
-        print("⚠️ logo.png not found – skipping logo.")
+        print("⚠️ logo.png not found — skipping image.")
 
     return wb
 
-# Streamlit UI setup
+# Streamlit UI
 st.set_page_config(page_title="911 Remittance Excel Generator", layout="centered")
 st.title("📄 Avalara PDF ➝ Branded Excel Report Generator")
-st.caption("Upload Avalara confirmations and get official remittance Excel files with your signature and logo.")
+st.caption("Upload Avalara confirmations and get remittance Excel reports auto-filled with your info and logo.")
 
-# Sidebar form: Section V info
+# Section V form
 st.sidebar.header("✍️ Section V – Certification Info")
 initials = st.sidebar.text_input("Initials", "Rhenry")
 title = st.sidebar.text_input("Title", "Sr Tax Analyst")
@@ -121,7 +121,7 @@ section_v_data = {
     "date": cert_date.strftime("%-m/%-d/%Y")
 }
 
-# Template + PDFs
+# Upload and generate logic
 template_file = "Template Report.xlsx"
 uploaded_files = st.file_uploader("Upload Avalara PDF(s)", type="pdf", accept_multiple_files=True)
 
@@ -150,10 +150,10 @@ if uploaded_files:
                     st.error(f"❌ Error processing {pdf.name}: {e}")
 
     zip_buffer.seek(0)
-    st.success("✅ All Excel files generated successfully!")
+    st.success("✅ All reports generated successfully!")
 
     st.download_button(
-        label="📦 Download ZIP of Reports",
+        label="📦 Download All as ZIP",
         data=zip_buffer,
         file_name="911_remittance_reports.zip",
         mime="application/zip"
