@@ -5,8 +5,8 @@ import io
 import zipfile
 import os
 import re
-from openpyxl import load_workbook
 from datetime import date
+from openpyxl import load_workbook
 
 # SECTION I Contact Info (Always Static)
 contact_info = {
@@ -16,14 +16,14 @@ contact_info = {
     "E-mail": "communicationonlinefiling@avalara.com"
 }
 
-# Extract text from PDF file
+# Extract text from PDF
 def extract_pdf_text(file_bytes):
     doc = fitz.open(stream=file_bytes, filetype="pdf")
     text = "".join([page.get_text() for page in doc])
     doc.close()
     return text
 
-# Parse required fields from text
+# Parse key data from PDF text
 def parse_pdf_data(text):
     lines = text.splitlines()
     data = {}
@@ -57,52 +57,50 @@ def parse_pdf_data(text):
 
     return data
 
-# Fill Excel template
+# Fill Excel Template
 def fill_excel_template(template_bytes, data_dict, section_v_data):
     wb = load_workbook(filename=template_bytes)
     ws = wb["Remittance Report"]
 
-    # SECTION I data (provider info)
+    # SECTION I
     ws["B7"] = data_dict.get("Provider Name", "")
     ws["B8"] = data_dict.get("Federal Tax ID", "")
     ws["B9"] = data_dict.get("Customer ID", "")
     ws["B11"] = data_dict.get("Address Line 1", "")
     ws["B12"] = data_dict.get("Address Line 2", "")
-
-    # SECTION I contact info
     ws["E7"] = contact_info["Contact Name"]
     ws["E8"] = contact_info["Phone"]
     ws["E9"] = contact_info["Fax"]
     ws["E10"] = contact_info["E-mail"]
-
     ws["E12"] = data_dict.get("Period Ending", "")
 
-    # Payment amount parsing
+    # SECTION I Payment
     payment_raw = data_dict.get("Payment Amount", "")
     payment_match = re.search(r"[\d,]+\.\d{2}", payment_raw)
-    if payment_match:
-        ws["F13"] = float(payment_match.group(0).replace(",", ""))
-    else:
-        ws["F13"] = 0.0
+    ws["F13"] = float(payment_match.group(0).replace(",", "")) if payment_match else 0.0
 
-    # SECTION V - Certification
-    ws["B41"] = section_v_data["initials"]
-    ws["E41"] = section_v_data["title"]
-    ws["F41"] = section_v_data["date"]
-    ws["B43"] = section_v_data["full_name"]
+    # SECTION V - CERTIFICATION
+    try:
+        # These should be the top-left cells of merged ranges
+        ws["B41"].value = section_v_data["initials"]
+        ws["E41"].value = section_v_data["title"]
+        ws["F41"].value = section_v_data["date"]
+        ws["B43"].value = section_v_data["full_name"]
+    except Exception as e:
+        print("❌ Error filling Section V:", e)
 
     return wb
 
-# Streamlit UI setup
+# Streamlit UI
 st.set_page_config(page_title="911 Remittance Excel Generator", layout="centered")
-st.title("📄 Avalara PDF ➝ Excel Remittance Report")
-st.caption("Upload Avalara PDFs to generate branded, pre-filled Excel reports.")
+st.title("📄 Avalara PDF ➝ Branded Excel Report Generator")
+st.caption("Upload Avalara confirmations to generate official, branded remittance reports.")
 
-# SECTION V Inputs in sidebar
-st.sidebar.title("✍️ Section V - Certification")
-initials = st.sidebar.text_input("Initials", value="Rhenry")
-title = st.sidebar.text_input("Title", value="Sr Tax Analyst")
-full_name = st.sidebar.text_input("Full Name", value="Rachel Henry")
+# SECTION V input (in sidebar)
+st.sidebar.header("✍️ Section V – Certification")
+initials = st.sidebar.text_input("Initials", "Rhenry")
+title = st.sidebar.text_input("Title", "Sr Tax Analyst")
+full_name = st.sidebar.text_input("Full Name", "Rachel Henry")
 cert_date = st.sidebar.date_input("Date", value=date.today())
 
 section_v_data = {
@@ -112,9 +110,10 @@ section_v_data = {
     "date": cert_date.strftime("%-m/%-d/%Y")  # Format: 4/15/2024
 }
 
-# Template file
+# Template file path (should be in same directory)
 template_file = "Template Report.xlsx"
 
+# Upload PDFs
 uploaded_files = st.file_uploader("Upload Avalara confirmation PDF(s)", type="pdf", accept_multiple_files=True)
 
 if uploaded_files:
@@ -122,7 +121,7 @@ if uploaded_files:
         with open(template_file, "rb") as f:
             template_bytes = io.BytesIO(f.read())
     except FileNotFoundError:
-        st.error(f"Template file not found: {template_file}")
+        st.error(f"❌ Template file not found: {template_file}")
         st.stop()
 
     zip_buffer = io.BytesIO()
@@ -130,23 +129,22 @@ if uploaded_files:
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
         for pdf in uploaded_files:
             with st.spinner(f"Processing {pdf.name}..."):
-                text = extract_pdf_text(pdf.read())
-                data = parse_pdf_data(text)
-                wb = fill_excel_template(template_bytes, data, section_v_data)
+                pdf_text = extract_pdf_text(pdf.read())
+                extracted_data = parse_pdf_data(pdf_text)
+                wb = fill_excel_template(template_bytes, extracted_data, section_v_data)
 
-                # Save to memory
                 excel_buffer = io.BytesIO()
                 wb.save(excel_buffer)
                 excel_buffer.seek(0)
 
-                excel_filename = os.path.splitext(pdf.name)[0] + ".xlsx"
-                zipf.writestr(excel_filename, excel_buffer.read())
+                output_name = os.path.splitext(pdf.name)[0] + ".xlsx"
+                zipf.writestr(output_name, excel_buffer.read())
 
     zip_buffer.seek(0)
-    st.success("✅ All reports generated successfully!")
+    st.success("✅ All Excel files generated!")
 
     st.download_button(
-        label="📦 Download All Excel Reports (ZIP)",
+        label="📦 Download ZIP of Excel Reports",
         data=zip_buffer,
         file_name="911_remittance_reports.zip",
         mime="application/zip"
