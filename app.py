@@ -101,17 +101,14 @@ def fill_excel_template(template_bytes, data_dict, section_v_data, surcharge_row
     match = re.search(r"[\d,]+\.\d{2}", payment_raw)
     ws["F13"] = float(match.group(0).replace(",", "")) if match else 0.0
 
-    # ✅ SAFELY UNMERGE and write to Section V
-    section_v_ranges = {
-        "B41:D41": "B41",
-        "E41:F41": "D41",
-        "B43:D43": "B43"
-    }
+    # ✅ Automatically unmerge any merged cell that overlaps our Section V fields
+    section_v_cells = ["B41", "D41", "F41", "B43"]
+    for merged_range in list(ws.merged_cells.ranges):
+        for cell in section_v_cells:
+            if cell in merged_range:
+                ws.unmerge_cells(str(merged_range))
 
-    for rng, anchor in section_v_ranges.items():
-        if rng in [str(r) for r in ws.merged_cells.ranges]:
-            ws.unmerge_cells(rng)
-
+    # ✅ Now safely write values
     ws["B41"] = section_v_data["initials"]
     ws["D41"] = section_v_data["title"]
     ws["F41"] = section_v_data["date"]
