@@ -101,9 +101,16 @@ def fill_excel_template(template_bytes, data_dict, section_v_data, surcharge_row
     match = re.search(r"[\d,]+\.\d{2}", payment_raw)
     ws["F13"] = float(match.group(0).replace(",", "")) if match else 0.0
 
-    for r in ["B41:D41", "E41:F41", "B43:D43"]:
-        if r in [str(rng) for rng in ws.merged_cells.ranges]:
-            ws.unmerge_cells(r)
+    # ✅ SAFELY UNMERGE and write to Section V
+    section_v_ranges = {
+        "B41:D41": "B41",
+        "E41:F41": "D41",
+        "B43:D43": "B43"
+    }
+
+    for rng, anchor in section_v_ranges.items():
+        if rng in [str(r) for r in ws.merged_cells.ranges]:
+            ws.unmerge_cells(rng)
 
     ws["B41"] = section_v_data["initials"]
     ws["D41"] = section_v_data["title"]
