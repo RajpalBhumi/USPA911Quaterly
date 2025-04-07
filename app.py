@@ -9,7 +9,7 @@ from datetime import date
 from openpyxl import load_workbook
 from openpyxl.drawing.image import Image as ExcelImage
 
-# SECTION I Contact Info (Fixed)
+# SECTION I Contact Info (Fixed Contact)
 contact_info = {
     "Contact Name": "Seth Tenore",
     "Phone": "877-780-4848",
@@ -17,27 +17,40 @@ contact_info = {
     "E-mail": "communicationonlinefiling@avalara.com"
 }
 
-# Extract Filing Period, Payment, and Address
+# Extract basic Section I data dynamically
+
 def extract_basic_data(text):
     lines = text.splitlines()
     data = {}
 
     for i, line in enumerate(lines):
-        if "Filing Period" in line:
+        l = line.lower()
+
+        if "provider name" in l or "company" in l:
+            data["Provider Name"] = lines[i + 1].strip()
+
+        elif "federal tax id" in l or "tax id" in l:
+            data["Federal Tax ID"] = lines[i + 1].strip()
+
+        elif "customer id" in l or "pa customer" in l:
+            data["Customer ID"] = lines[i + 1].strip()
+
+        elif "address line 1" in l or "street" in l or "road" in l:
+            data["Address Line 1"] = lines[i + 1].strip()
+
+        elif "city" in l or "state" in l or "zip" in l:
+            data["Address Line 2"] = lines[i + 1].strip()
+
+        elif "filing period" in l:
             data["Period Ending"] = lines[i + 1].strip()
-        elif "Payment Amount" in line:
+
+        elif "payment amount" in l:
             data["Payment Amount"] = lines[i + 1].strip()
-        elif "Walter Road" in line:
-            data["Address Line 1"] = "358 Walter Road"
-        elif "Cochranville" in line:
-            data["Address Line 2"] = "Cochranville, PA 19330"
-        elif "Unified Communications LLC" in line and "46" in line:
-            data["Provider Name"] = "Affiliated Unified"
-            data["Federal Tax ID"] = "465746085"
-            data["Customer ID"] = "1148455"
+
     return data
 
-# Extract Section II and III values using pdfplumber
+# Extract surcharge table values
+
 def extract_surcharge_rows_pdfplumber(file):
     months = {
         "January", "February", "March", "April", "May", "June",
@@ -66,15 +79,13 @@ def extract_surcharge_rows_pdfplumber(file):
                             continue
     return result
 
-# Fill Excel template
+# Fill Excel template with extracted data
+
 def fill_excel_template(template_bytes, data_dict, section_v_data, surcharge_rows):
     wb = load_workbook(filename=template_bytes)
     ws = wb["Remittance Report"]
-
-    # Unlock sheet
     ws.protection.sheet = False
 
-    # SECTION I
     ws["B7"] = data_dict.get("Provider Name", "")
     ws["B8"] = data_dict.get("Federal Tax ID", "")
     ws["B9"] = data_dict.get("Customer ID", "")
@@ -86,38 +97,31 @@ def fill_excel_template(template_bytes, data_dict, section_v_data, surcharge_row
     ws["E10"] = contact_info["E-mail"]
     ws["E12"] = data_dict.get("Period Ending", "")
 
-    # Payment
     payment_raw = data_dict.get("Payment Amount", "")
     match = re.search(r"[\d,]+\.\d{2}", payment_raw)
     ws["F13"] = float(match.group(0).replace(",", "")) if match else 0.0
 
-    # SECTION V – Signature
-    try:
-        for r in ["B41:D41", "E41:F41", "B43:D43"]:
-            if r in [str(rng) for rng in ws.merged_cells.ranges]:
-                ws.unmerge_cells(r)
-        ws["B41"] = section_v_data["initials"]
-        ws["D41"] = section_v_data["title"]
-        ws["F41"] = section_v_data["date"]
-        ws["B43"] = section_v_data["full_name"]
-    except Exception as e:
-        print("Section V Error:", e)
+    for r in ["B41:D41", "E41:F41", "B43:D43"]:
+        if r in [str(rng) for rng in ws.merged_cells.ranges]:
+            ws.unmerge_cells(r)
 
-    # SECTION II – Start at row 17
+    ws["B41"] = section_v_data["initials"]
+    ws["D41"] = section_v_data["title"]
+    ws["F41"] = section_v_data["date"]
+    ws["B43"] = section_v_data["full_name"]
+
     start_row_ii = 17
     for i, row in enumerate(surcharge_rows[:3]):
         ws[f"B{start_row_ii + i}"] = row["month"]
         ws[f"C{start_row_ii + i}"] = row["assessed"]
         ws[f"D{start_row_ii + i}"] = row["collected"]
 
-    # SECTION III – Start at row 30
     start_row_iii = 30
     for i, row in enumerate(surcharge_rows[3:6]):
         ws[f"B{start_row_iii + i}"] = row["month"]
         ws[f"C{start_row_iii + i}"] = row["assessed"]
         ws[f"D{start_row_iii + i}"] = row["collected"]
 
-    # Logo
     try:
         logo = ExcelImage("logo.png")
         logo.width = 150
@@ -132,7 +136,6 @@ def fill_excel_template(template_bytes, data_dict, section_v_data, surcharge_row
 st.set_page_config(page_title="911 Remittance Excel Generator", layout="centered")
 st.title("📄 Avalara PDF ➝ Branded Excel Report Generator")
 
-# Section V inputs
 st.sidebar.header("✍️ Section V – Certification Info")
 initials = st.sidebar.text_input("Initials", "Rhenry")
 title = st.sidebar.text_input("Title", "Sr Tax Analyst")
