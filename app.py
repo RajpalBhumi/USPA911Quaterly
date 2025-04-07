@@ -105,7 +105,7 @@ def fill_excel_template(template_bytes, data_dict, section_v_data, surcharge_row
     section_v_cells = ["B41", "D41", "F41", "B43"]
     for merged_range in list(ws.merged_cells.ranges):
         for cell in section_v_cells:
-            if cell in merged_range:
+            if cell in merged_range.cells:
                 ws.unmerge_cells(str(merged_range))
 
     # ✅ Now safely write values
